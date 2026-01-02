@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ضبط پیشرفته S24</title>
+    <style>
+        :root {
+            --primary-color: #00ff88;
+            --danger-color: #ff3366;
+            --bg-color: #0a0a0a;
+            --panel-bg: rgba(20, 20, 20, 0.85);
+            --text-color: #e0e0e0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* استایل دوربین */
+        #camera-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: #000;
+        }
+
+        #camera-feed {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* حالت آینه */
+            opacity: 0.6; /* کمی تاریک برای دیده شدن بهتر دکمه‌ها */
+            transition: opacity 0.5s;
+        }
+
+        /* لایه رابط کاربری */
+        .ui-layer {
+            position: absolute;
+            z-index: 10;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px;
+            pointer-events: none;
+        }
+
+        /* هدر وضعیت */
+        .status-header {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .info-card {
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 12px 20px;
+            font-size: 13px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 350px;
+            justify-content: space-between;
+        }
+
+        /* لودینگ بار حافظه */
+        .storage-loader {
+            width: 100%;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            margin-top: 5px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .storage-bar {
+            height: 100%;
+            background: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* تایمر */
+        .timer-display {
+            font-family: monospace;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--danger-color);
+            text-shadow: 0 0 10px rgba(255, 51, 102, 0.5);
+            display: none; /* مخفی تا زمان ضبط */
+            background: rgba(0,0,0,0.7);
+            padding: 5px 15px;
+            border-radius: 8px;
+        }
+
+        /* فوتر کنترل‌ها */
+        .controls-footer {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 20px;
+            pointer-events: auto;
+        }
+
+        .btn-main {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 4px solid rgba(255,255,255,0.2);
+            background: transparent;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-inner {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            transition: all 0.3s ease;
+            box-shadow: 0 0 15px var(--primary-color);
+        }
+
+        /* حالت ضبط (دکمه مربع قرمز) */
+        .btn-main.recording {
+            border-color: var(--danger-color);
+        }
+        .btn-main.recording .btn-inner {
+            background: var(--danger-color);
+            border-radius: 15px; /* مربع شدن */
+            transform: scale(0.6);
+            box-shadow: 0 0 20px var(--danger-color);
+            animation: pulse-recording 2s infinite;
+        }
+
+        @keyframes pulse-recording {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        /* دیالوگ پاپ‌آپ */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal-content {
+            background: #1a1a1a;
+            padding: 25px;
+            border-radius: 20px;
+            width: 85%;
+            max-width: 320px;
+            text-align: center;
+            border: 1px solid #333;
+        }
+        .modal-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: var(--primary-color);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            width: 100%;
+        }
+
+        /* استایل اسکنر حافظه */
+        .scan-text {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="camera-container">
+        <video id="camera-feed" autoplay playsinline muted></video>
+    </div>
+
+    <div class="ui-layer">
+        <!-- پنل بالای صفحه -->
+        <div class="status-header">
+            <div class="info-card" id="storage-card">
+                <div style="width: 100%">
+                    <div style="display:flex; justify-content:space-between;">
+                        <span id="storage-status-text">سیستم آماده‌سازی...</span>
+                        <span id="storage-percent">0%</span>
+                    </div>
+                    <div class="storage-loader">
+                        <div class="storage-bar" id="storage-progress-bar"></div>
+                    </div>
+                    <div class="scan-text">
+                        <span id="scan-detail">در حال اسکن...</span>
+                        <span id="free-space">--</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="timer-display" class="timer-display">00:00:00</div>
+        </div>
+
+        <!-- دکمه ضبط -->
+        <div class="controls-footer">
+            <button id="record-btn" class="btn-main">
+                <div class="btn-inner"></div>
+            </button>
+        </div>
+    </div>
+
+    <!-- مودال پیام -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 10px; color: #fff;">پیام سیستم</h3>
+            <p id="modal-msg" style="color: #ccc; font-size: 14px; line-height: 1.5;">...</p>
+            <button class="modal-btn" onclick="closeModal()">متوجه شدم</button>
+        </div>
+    </div>
+
+    <script>
+        // === متغیرها ===
+        let mediaRecorder;
+        let recordedChunks = [];
+        let stream = null;
+        let isRecording = false;
+        let timerInterval;
+        let startTime;
+        let storageScanInterval;
+
+        // === المان‌ها ===
+        const videoElement = document.getElementById('camera-feed');
+        const recordBtn = document.getElementById('record-btn');
+        const timerDisplay = document.getElementById('timer-display');
+        const progressBar = document.getElementById('storage-progress-bar');
+        const storageStatusText = document.getElementById('storage-status-text');
+        const scanDetail = document.getElementById('scan-detail');
+        const freeSpaceText = document.getElementById('free-space');
+        const storagePercentText = document.getElementById('storage-percent');
+
+        // === راه‌اندازی اولیه ===
+        window.onload = () => {
+            simulateSystemCheck();
+            requestCameraPermission(); // درخواست دسترسی به محض ورود
+        };
+
+        // === منطق اسکن حافظه (شبیه‌سازی + واقعی) ===
+        function simulateSystemCheck() {
+            let width = 0;
+            const totalTime = 3000; // 3 ثانیه اسکن
+            const intervalTime = 50;
+            const step = 100 / (totalTime / intervalTime);
+
+            const scanTimer = setInterval(() => {
+                width += step;
+                if (width > 100) width = 100;
+                
+                progressBar.style.width = width + '%';
+                storagePercentText.innerText = Math.round(width) + '%';
+                
+                if (width < 30) scanDetail.innerText = "بررسی درایو...";
+                else if (width < 70) scanDetail.innerText = "محاسبه فضای آزاد...";
+                else scanDetail.innerText = "نهایی‌سازی...";
+
+                if (width >= 100) {
+                    clearInterval(scanTimer);
+                    performActualStorageCheck(); // حالا چک واقعی را انجام بده
+                }
+            }, intervalTime);
+        }
+
+        async function performActualStorageCheck() {
+            if ('storage' in navigator && 'estimate' in navigator.storage) {
+                try {
+                    // تایم‌اوت برای جلوگیری از هنگ کردن
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error("Timeout")), 2000)
+                    );
+                    const storagePromise = navigator.storage.estimate();
+
+                    const {usage, quota} = await Promise.race([storagePromise, timeoutPromise]);
+                    
+                    const usedGB = (usage / (1024*1024*1024)).toFixed(2);
+                    const totalGB = (quota / (1024*1024*1024)).toFixed(2);
+                    const freeGB = ((quota - usage) / (1024*1024*1024)).toFixed(2);
+                    const percentUsed = Math.round((usage / quota) * 100);
+
+                    // آپدیت UI
+                    storageStatusText.innerText = "وضعیت حافظه";
+                    scanDetail.innerText = "آماده ضبط";
+                    freeSpaceText.innerText = freeGB + " GB آزاد";
+                    
+                    // تغییر رنگ اگر حافظه پر است
+                    if (percentUsed > 90) {
+                        progressBar.style.backgroundColor = "var(--danger-color)";
+                        scanDetail.innerText = "هشدار: حافظه پر است!";
+                    } else {
+                        progressBar.style.backgroundColor = "var(--primary-color)";
+                    }
+                    progressBar.style.width = percentUsed + '%';
+                    storagePercentText.innerText = percentUsed + '%';
+
+                } catch (err) {
+                    console.log("Storage check failed or timed out", err);
+                    storageStatusText.innerText = "حافظه: نامشخص";
+                    scanDetail.innerText = "خطا در دسترسی";
+                    progressBar.style.width = '100%';
+                    progressBar.style.backgroundColor = '#555';
+                }
+            } else {
+                storageStatusText.innerText = "حافظه: پشتیبانی نمی‌شود";
+            }
+        }
+
+        // === دسترسی به دوربین (اصلاح شده برای S24) ===
+        async function requestCameraPermission() {
+            try {
+                // تلاش اول: تنظیمات بهینه
+                const constraints = {
+                    audio: true,
+                    video: {
+                        facingMode: "user",
+                        width: { ideal: 640 }, // رزولوشن استاندارد (نه خیلی کم که ارور بده)
+                        height: { ideal: 480 },
+                        frameRate: { ideal: 15 }
+                    }
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                handleSuccess(stream);
+
+            } catch (err) {
+                console.warn("High quality failed, trying fallback...", err);
+                try {
+                    // تلاش دوم: حداقل تنظیمات (فقط تصویر بده، مهم نیست چی)
+                    const fallbackConstraints = {
+                        audio: true,
+                        video: true // هر چی داری بده
+                    };
+                    stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+                    handleSuccess(stream);
+                } catch (finalErr) {
+                    showModal("خطا: دسترسی به دوربین امکان‌پذیر نیست.\n\nلطفا از تنظیمات گوشی (Settings > Apps) دسترسی Camera را به این برنامه بدهید.");
+                    console.error(finalErr);
+                }
+            }
+        }
+
+        function handleSuccess(stream) {
+            videoElement.srcObject = stream;
+            // روشن کردن صفحه هنگام ضبط (Wake Lock)
+            if ('wakeLock' in navigator) {
+                navigator.wakeLock.request('screen').catch(console.error);
+            }
+        }
+
+        // === کنترل ضبط ===
+        recordBtn.addEventListener('click', () => {
+            if (!isRecording) {
+                if (!stream) {
+                    requestCameraPermission(); // تلاش مجدد
+                    return;
+                }
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        function startRecording() {
+            recordedChunks = [];
+            // استفاده از کدک‌های استاندارد موبایل
+            let options = { mimeType: 'video/webm;codecs=vp8,opus' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'video/mp4' }; // فال‌بک برای برخی گوشی‌ها
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options = {}; // پیش‌فرض سیستم
+                }
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(stream, options);
+            } catch (e) {
+                showModal("خطا در شروع ضبط. لطفا برنامه را ببندید و دوباره باز کنید.");
+                return;
+            }
+
+            mediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) recordedChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = saveVideo;
+
+            mediaRecorder.start(1000); // ذخیره هر 1 ثانیه
+            isRecording = true;
+            
+            // تغییر ظاهر دکمه
+            recordBtn.classList.add('recording');
+            timerDisplay.style.display = 'block';
+            videoElement.style.opacity = '1'; // روشن‌تر شدن تصویر
+
+            // شروع تایمر
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 1000);
+
+            // شروع بررسی مداوم حافظه (هر 10 ثانیه)
+            storageScanInterval = setInterval(performActualStorageCheck, 10000);
+        }
+
+        function stopRecording() {
+            if (!mediaRecorder) return;
+            mediaRecorder.stop();
+            isRecording = false;
+
+            // تغییر ظاهر دکمه
+            recordBtn.classList.remove('recording');
+            timerDisplay.style.display = 'none';
+            videoElement.style.opacity = '0.6';
+
+            clearInterval(timerInterval);
+            clearInterval(storageScanInterval);
+            timerDisplay.innerText = "00:00:00";
+        }
+
+        function saveVideo() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const now = new Date();
+            const filename = `S24_Rec_${now.getTime()}.webm`;
+
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                showModal(`ویدیو ذخیره شد!\nحجم: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+            }, 100);
+        }
+
+        function updateTimer() {
+            const diff = Date.now() - startTime;
+            const date = new Date(diff);
+            const str = date.toISOString().substr(11, 8); // فرمت 00:00:00
+            timerDisplay.innerText = str;
+        }
+
+        // === مدیریت پاپ‌آپ ===
+        function showModal(msg) {
+            document.getElementById('modal-msg').innerText = msg;
+            document.getElementById('modal').classList.add('active');
+        }
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        // تلاش برای ادامه ضبط در پس‌زمینه (محدودیت سیستم عامل وجود دارد)
+        document.addEventListener("visibilitychange", () => {
+           if (document.hidden && isRecording) {
+               console.log("App minimized - attempting to keep recorder alive");
+           }
+        });
+
+    </script>
+</body>
+</html>
